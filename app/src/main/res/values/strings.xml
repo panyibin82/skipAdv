@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">skipAdv</string>
+    <string name="accessibility_service_label">skipAdv 广告跳过服务</string>
+    <string name="accessibility_service_description">监视正在显示的前台应用界面，当匹配到广告规则中的特征时，自动点击"跳过/关闭"按钮或按返回键，从而自动关闭广告弹窗。该服务仅在本 app 内置且可信的规则范围内生效。</string>
+</resources>
