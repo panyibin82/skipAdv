@@ -17,9 +17,19 @@ android {
         versionName = "0.1.0"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = rootProject.file("skipadv-release.jks")
+            storePassword = "skipadv2026"
+            keyAlias = "skipadv"
+            keyPassword = "skipadv2026"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
