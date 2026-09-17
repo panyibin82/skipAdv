@@ -13,6 +13,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import com.skipadv.rule.GlobalRule
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -32,6 +34,7 @@ fun HomeScreen(viewModel: RulesViewModel = viewModel()) {
     val enabled = remember(refresh) { isAccessibilityEnabled(context) }
     val rules by viewModel.rules.collectAsState()
     val appCount = rules.map { it.appId }.distinct().size
+    var globalOn by remember { mutableStateOf(GlobalRule.enabled) }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -62,6 +65,27 @@ fun HomeScreen(viewModel: RulesViewModel = viewModel()) {
                         context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                     }) { Text("去开启/去设置") }
                     OutlinedButton(onClick = { refresh++ }) { Text("刷新") }
+                }
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp)) {
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("全局兜底规则", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "所有应用切换后 10 秒内，自动点击\"跳过\"及 close/skip 关闭按钮",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Switch(
+                        checked = globalOn,
+                        onCheckedChange = {
+                            globalOn = it
+                            GlobalRule.setEnabled(context, it)
+                        },
+                    )
                 }
             }
         }

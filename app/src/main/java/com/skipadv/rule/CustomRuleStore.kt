@@ -44,6 +44,7 @@ object CustomRuleStore {
                 )
             }.toMutableList()
         } catch (e: Exception) {
+            android.util.Log.e("CustomRuleStore", "failed to load custom rules", e)
             mutableListOf()
         }
     }

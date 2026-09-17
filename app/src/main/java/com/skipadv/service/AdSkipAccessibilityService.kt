@@ -7,6 +7,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.skipadv.action.ActionExecutor
 import com.skipadv.rule.CustomRuleStore
+import com.skipadv.rule.GlobalRule
 import com.skipadv.rule.MatchableNode
 import com.skipadv.rule.Matcher
 import com.skipadv.rule.Selector
@@ -26,6 +27,13 @@ class AdSkipAccessibilityService : AccessibilityService() {
     private val lastTriggered = HashMap<String, Long>()
     private val groupEnabled = HashMap<String, Boolean>()
 
+        // Tracks foreground package changes for the global rule's match window.
+        private var lastForegroundPkg: String? = null
+        private var foregroundChangedAt: Long = 0L
+
+        /** Global rule fires at most once per foreground app switch. */
+        private var globalFiredForPkg: String? = null
+
     /** UI toggles a rule on/off by its "$pkg#${group.key}" id. */
     fun setRuleEnabled(id: String, enabled: Boolean) {
         groupEnabled[id] = enabled
@@ -35,11 +43,25 @@ class AdSkipAccessibilityService : AccessibilityService() {
         val pkg = event.packageName?.toString() ?: return
         if (pkg == packageName) return
 
+        val now = System.currentTimeMillis()
+        if (pkg != lastForegroundPkg) {
+            lastForegroundPkg = pkg
+            foregroundChangedAt = now
+        }
+
         // Only user-defined custom rules fire for this package.
         val groups = CustomRuleStore.load(this)
             .filter { it.enabled && it.appId == pkg }
             .map { CustomRuleStore.toGroupRule(it) }
-        if (groups.isEmpty()) return
+
+        // Global fallback: any app, but only shortly after a foreground switch
+        // (splash-ad window) and at most once per switch, so in-app popups
+        // aren't clicked blindly.
+        val globalActive = GlobalRule.enabled &&
+            now - foregroundChangedAt <= GlobalRule.windowMs &&
+            globalFiredForPkg != pkg
+
+        if (groups.isEmpty() && !globalActive) return
         val root = rootInActiveWindow ?: return
         // Only match the app that is actually in the foreground; the event source can
         // be a background window while another app is showing.
@@ -48,23 +70,41 @@ class AdSkipAccessibilityService : AccessibilityService() {
 
         try {
             val wrapped = AccessibilityNodeAdapter(root)
-            val now = System.currentTimeMillis()
-            for ((groupKey, group) in groups) {
-                val id = "$pkg#$groupKey"
-                if (groupEnabled[id] == false) continue
-                if (now - (lastTriggered[id] ?: 0L) < cooldownMs) continue
 
-                try {
-                    val selector = Selector.parse(group.matches)
-                    val target = Matcher.findNode(wrapped, selector) ?: continue
-                    val rawTarget = (target as? AccessibilityNodeAdapter)?.raw
-                    Log.i(TAG, "match: $id ${group.name} action=${group.action}")
-                    ActionExecutor.execute(this, group.action, rawTarget)
-                    lastTriggered[id] = now
-                    // One action per event: further groups would run against a stale tree.
-                    break
-                } catch (e: Exception) {
-                    Log.w(TAG, "rule failed for ${group.matches}", e)
+            if (groups.isNotEmpty()) {
+                for ((groupKey, group) in groups) {
+                    val id = "$pkg#$groupKey"
+                    if (groupEnabled[id] == false) continue
+                    if (now - (lastTriggered[id] ?: 0L) < cooldownMs) continue
+
+                    try {
+                        val selector = Selector.parse(group.matches)
+                        val target = Matcher.findNode(wrapped, selector) ?: continue
+                        val rawTarget = (target as? AccessibilityNodeAdapter)?.raw
+                        Log.i(TAG, "match: $id ${group.name} action=${group.action}")
+                        ActionExecutor.execute(this, group.action, rawTarget)
+                        lastTriggered[id] = now
+                        // One action per event: further groups would run against a stale tree.
+                        return
+                    } catch (e: Exception) {
+                        Log.w(TAG, "rule failed for ${group.matches}", e)
+                    }
+                }
+            }
+
+            if (globalActive) {
+                for (sel in GlobalRule.selectors) {
+                    try {
+                        val selector = Selector.parse(sel)
+                        val target = Matcher.findNode(wrapped, selector) ?: continue
+                        val rawTarget = (target as? AccessibilityNodeAdapter)?.raw
+                        Log.i(TAG, "global match: $pkg $sel")
+                        ActionExecutor.execute(this, "click", rawTarget)
+                        globalFiredForPkg = pkg
+                        return
+                    } catch (e: Exception) {
+                        Log.w(TAG, "global rule failed: $sel", e)
+                    }
                 }
             }
         } finally {
