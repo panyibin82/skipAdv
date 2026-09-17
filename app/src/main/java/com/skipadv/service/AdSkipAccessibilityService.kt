@@ -9,7 +9,6 @@ import com.skipadv.action.ActionExecutor
 import com.skipadv.rule.CustomRuleStore
 import com.skipadv.rule.MatchableNode
 import com.skipadv.rule.Matcher
-import com.skipadv.rule.RuleRepository
 import com.skipadv.rule.Selector
 
 /**
@@ -36,12 +35,10 @@ class AdSkipAccessibilityService : AccessibilityService() {
         val pkg = event.packageName?.toString() ?: return
         if (pkg == packageName) return
 
-        // Built-in rules for this package, plus any user-defined custom rules.
-        val builtin = RuleRepository.groupsFor(pkg) ?: emptyList()
-        val custom = CustomRuleStore.load(this)
+        // Only user-defined custom rules fire for this package.
+        val groups = CustomRuleStore.load(this)
             .filter { it.enabled && it.appId == pkg }
             .map { CustomRuleStore.toGroupRule(it) }
-        val groups = builtin.map { it.key to it } + custom
         if (groups.isEmpty()) return
         val root = rootInActiveWindow ?: return
         // Only match the app that is actually in the foreground; the event source can

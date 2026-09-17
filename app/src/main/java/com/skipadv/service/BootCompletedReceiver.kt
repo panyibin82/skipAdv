@@ -14,12 +14,7 @@ import android.util.Log
 class BootCompletedReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
-        try {
-            com.skipadv.rule.RuleRepository.load(context)
-            Log.i(TAG, "boot completed; rules preloaded, waiting for service bind")
-        } catch (e: Exception) {
-            Log.w(TAG, "boot preload failed", e)
-        }
+        Log.i(TAG, "boot completed; waiting for accessibility service rebind")
     }
 
     companion object {

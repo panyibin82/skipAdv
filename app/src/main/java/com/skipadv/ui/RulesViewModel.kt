@@ -3,7 +3,6 @@ package com.skipadv.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import com.skipadv.rule.CustomRuleStore
-import com.skipadv.rule.RuleRepository
 import com.skipadv.service.AdSkipAccessibilityService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,11 +39,7 @@ class RulesViewModel(app: Application) : AndroidViewModel(app) {
 
     fun reload() {
         val context = getApplication<Application>()
-        val builtin = RuleRepository.allApps().flatMap { app ->
-            app.groups.map { g ->
-                RuleUi(app.appId, g.key, g.name, g.matches, g.action, enabled = true)
-            }
-        }
+        // No built-in rules: only user-defined custom rules are used.
         val custom = CustomRuleStore.load(context).map { r ->
             val (_, group) = CustomRuleStore.toGroupRule(r)
             RuleUi(
@@ -58,7 +53,7 @@ class RulesViewModel(app: Application) : AndroidViewModel(app) {
                 customStoreId = r.id,
             )
         }
-        _rules.value = custom + builtin
+        _rules.value = custom
     }
 
     /** Lists installed launchable apps (sorted, for the rule-creation picker). */
@@ -180,6 +175,15 @@ class RulesViewModel(app: Application) : AndroidViewModel(app) {
         val list = CustomRuleStore.load(context).filter { it.id != storeId }
         CustomRuleStore.save(context, list)
         reload()
+    }
+
+    /** Deletes every user-defined rule. Returns how many were removed. */
+    fun deleteAllRules(): Int {
+        val context = getApplication<Application>()
+        val removed = CustomRuleStore.load(context).size
+        CustomRuleStore.save(context, emptyList())
+        reload()
+        return removed
     }
 
     fun toggle(id: String) {
