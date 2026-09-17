@@ -12,14 +12,20 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Done
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
-import androidx.compose.material3.Card
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -42,30 +48,65 @@ fun RulesScreen(viewModel: RulesViewModel = viewModel()) {
     var showDeleteAll by remember { mutableStateOf(false) }
     var showSave by remember { mutableStateOf(false) }
     var showImport by remember { mutableStateOf(false) }
+    var toast by remember { mutableStateOf<String?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    toast?.let { msg ->
+        androidx.compose.material3.Snackbar(
+            modifier = Modifier.padding(16.dp),
+            action = { TextButton(onClick = { toast = null }) { Text("知道了") } },
+        ) { Text(msg) }
+    }
 
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                .padding(start = 16.dp, end = 8.dp, top = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("规则", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-            if (rules.isNotEmpty()) {
-                TextButton(onClick = { showSave = true }) { Text("保存") }
-                TextButton(onClick = { showImport = true }) { Text("导入") }
-                TextButton(onClick = { showDeleteAll = true }) {
-                    Text("全部删除", color = MaterialTheme.colorScheme.error)
+            IconButton(onClick = {
+                if (rules.isEmpty()) {
+                    toast = "当前没有规则可保存"
+                } else {
+                    showSave = true
                 }
+            }) {
+                Icon(
+                    Icons.Outlined.Done,
+                    contentDescription = "保存",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
             }
-            Button(onClick = { showAdd = true }) { Text("+ 添加") }
+            IconButton(onClick = { showImport = true }) {
+                Icon(
+                    Icons.Outlined.Email,
+                    contentDescription = "导入",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+            IconButton(onClick = { showDeleteAll = true }) {
+                Icon(
+                    Icons.Outlined.Delete,
+                    contentDescription = "全部删除",
+                    tint = MaterialTheme.colorScheme.error,
+                )
+            }
+            IconButton(onClick = { showAdd = true }) {
+                Icon(
+                    Icons.Filled.AddCircle,
+                    contentDescription = "添加规则",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
 
         if (rules.isEmpty()) {
             Column(Modifier.fillMaxSize().padding(24.dp)) {
                 Text(
-                    "暂无规则。\n\n点右上角「+ 添加规则」：\n• ⚡批量模式：输入关键词（如\"跳过\"），一键应用到全部应用\n• 单个模式：只为选定的应用添加",
+                    "暂无规则。\n\n点右上角 ⊕ 添加规则：\n• ⚡批量模式：输入关键词（如\"跳过\"），一键应用到全部应用\n• 单个模式：只为选定的应用添加",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
