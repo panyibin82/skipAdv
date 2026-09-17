@@ -40,22 +40,26 @@ fun RulesScreen(viewModel: RulesViewModel = viewModel()) {
     val rules by viewModel.rules.collectAsState()
     var showAdd by remember { mutableStateOf(false) }
     var showDeleteAll by remember { mutableStateOf(false) }
+    var showSave by remember { mutableStateOf(false) }
+    var showImport by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier
                 .fillMaxWidth()
                 .padding(start = 16.dp, end = 16.dp, top = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("规则", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
             if (rules.isNotEmpty()) {
+                TextButton(onClick = { showSave = true }) { Text("保存") }
+                TextButton(onClick = { showImport = true }) { Text("导入") }
                 TextButton(onClick = { showDeleteAll = true }) {
                     Text("全部删除", color = MaterialTheme.colorScheme.error)
                 }
             }
-            Button(onClick = { showAdd = true }) { Text("+ 添加规则") }
+            Button(onClick = { showAdd = true }) { Text("+ 添加") }
         }
 
         if (rules.isEmpty()) {
@@ -109,6 +113,126 @@ fun RulesScreen(viewModel: RulesViewModel = viewModel()) {
             },
         )
     }
+
+    if (showSave) {
+        SaveBackupDialog(
+            viewModel = viewModel,
+            onDismiss = { showSave = false },
+        )
+    }
+
+    if (showImport) {
+        ImportBackupDialog(
+            viewModel = viewModel,
+            onDismiss = { showImport = false },
+        )
+    }
+}
+
+@Composable
+private fun SaveBackupDialog(viewModel: RulesViewModel, onDismiss: () -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    val existing = remember { viewModel.backupNames() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("保存规则") },
+        text = {
+            Column {
+                Text(
+                    "将当前 ${viewModel.rules.collectAsState().value.size} 条规则保存为一个存档",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it; error = null },
+                    label = { Text("存档名称") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                )
+                if (existing.isNotEmpty()) {
+                    Text(
+                        "已有存档：${existing.joinToString("、")}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                error?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                if (viewModel.saveBackup(name)) onDismiss() else error = "请输入名称"
+            }) { Text("保存") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+    )
+}
+
+@Composable
+private fun ImportBackupDialog(viewModel: RulesViewModel, onDismiss: () -> Unit) {
+    var names by remember { mutableStateOf(viewModel.backupNames()) }
+    var message by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("导入规则") },
+        text = {
+            Column {
+                Text(
+                    "选择一个存档，其中的规则将追加到当前规则后（不会清空现有规则）",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                if (names.isEmpty()) {
+                    Text(
+                        "暂无存档，请先「保存」",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 320.dp)
+                            .padding(top = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        items(names, key = { it }) { name ->
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                TextButton(onClick = {
+                                    val added = viewModel.importBackup(name)
+                                    message = "已从「$name」导入 $added 条规则"
+                                }) {
+                                    Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                                TextButton(onClick = {
+                                    viewModel.deleteBackup(name)
+                                    names = viewModel.backupNames()
+                                }) {
+                                    Text("删", color = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
+                    }
+                }
+                message?.let {
+                    Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("完成") }
+        },
+    )
 }
 
 @Composable

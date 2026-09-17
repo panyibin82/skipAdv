@@ -186,6 +186,40 @@ class RulesViewModel(app: Application) : AndroidViewModel(app) {
         return removed
     }
 
+    // ---- Named backups ----
+
+    fun backupNames(): List<String> = CustomRuleStore.backupNames(getApplication())
+
+    fun saveBackup(name: String): Boolean {
+        val n = name.trim()
+        if (n.isEmpty()) return false
+        val context = getApplication<Application>()
+        CustomRuleStore.saveBackup(context, n, CustomRuleStore.load(context))
+        return true
+    }
+
+    /** Appends all rules from backup [name] to the current list (ids reassigned). */
+    fun importBackup(name: String): Int {
+        val context = getApplication<Application>()
+        val current = CustomRuleStore.load(context)
+        val backup = CustomRuleStore.loadBackup(context, name)
+        if (backup.isEmpty()) return 0
+        var nextId = (current.maxOfOrNull { it.id } ?: 0L) + 1L
+        val merged = current.toMutableList()
+        var added = 0
+        for (r in backup) {
+            merged.add(r.copy(id = nextId++))
+            added++
+        }
+        CustomRuleStore.save(context, merged)
+        reload()
+        return added
+    }
+
+    fun deleteBackup(name: String) {
+        CustomRuleStore.deleteBackup(getApplication(), name)
+    }
+
     fun toggle(id: String) {
         val rule = _rules.value.firstOrNull { it.id == id } ?: return
         if (rule.isCustom) {

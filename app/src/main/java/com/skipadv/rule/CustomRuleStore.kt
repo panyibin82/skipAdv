@@ -68,6 +68,62 @@ object CustomRuleStore {
             .edit().putString(KEY, arr.toString()).apply()
     }
 
+    // ---- Named backups (save / import) ----
+
+    private const val BACKUPS = "rule_backups"
+
+    /** Saves [rules] under [name]; overwrites an existing backup with the same name. */
+    fun saveBackup(context: Context, name: String, rules: List<CustomRule>) {
+        val arr = JSONArray()
+        rules.forEach { r ->
+            arr.put(
+                JSONObject().apply {
+                    put("appId", r.appId)
+                    put("appName", r.appName)
+                    put("pattern", r.pattern)
+                    put("action", r.action)
+                    put("enabled", r.enabled)
+                    put("isRaw", r.isRaw)
+                },
+            )
+        }
+        context.getSharedPreferences(BACKUPS, Context.MODE_PRIVATE)
+            .edit().putString(name, arr.toString()).apply()
+    }
+
+    /** All backup names, newest first (SharedPreferences order is unspecified, sort it). */
+    fun backupNames(context: Context): List<String> =
+        context.getSharedPreferences(BACKUPS, Context.MODE_PRIVATE)
+            .all.keys.sorted()
+
+    /** Loads a backup by name; empty list if missing/corrupt. */
+    fun loadBackup(context: Context, name: String): List<CustomRule> {
+        val raw = context.getSharedPreferences(BACKUPS, Context.MODE_PRIVATE)
+            .getString(name, null) ?: return emptyList()
+        return try {
+            val arr = JSONArray(raw)
+            (0 until arr.length()).mapNotNull { i ->
+                val o = arr.getJSONObject(i)
+                CustomRule(
+                    id = 0L, // reassigned on import
+                    appId = o.getString("appId"),
+                    appName = o.optString("appName", o.getString("appId")),
+                    pattern = o.getString("pattern"),
+                    action = o.optString("action", "click"),
+                    enabled = o.optBoolean("enabled", true),
+                    isRaw = o.optBoolean("isRaw", false),
+                )
+            }
+        } catch (e: Exception) {
+            mutableListOf()
+        }
+    }
+
+    fun deleteBackup(context: Context, name: String) {
+        context.getSharedPreferences(BACKUPS, Context.MODE_PRIVATE)
+            .edit().remove(name).apply()
+    }
+
     /** Converts a custom rule into the selector + group key used by the matcher. */
     fun toGroupRule(rule: CustomRule): Pair<Int, GroupRule> {
         val key = (rule.id % Int.MAX_VALUE).toInt()
